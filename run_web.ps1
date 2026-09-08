@@ -1,32 +1,25 @@
+param([switch]$Check,[switch]$InstallOnly,[switch]$SkipBrowser)
+$ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
-
-if (-not (Test-Path ".\.venv\Scripts\python.exe")) {
-    Write-Host "Creating .venv ..."
-    py -3 -m venv .venv
-    if ($LASTEXITCODE -ne 0) {
-        python -m venv .venv
+$env:PYTHONUTF8 = '1'
+$forward = @()
+if ($Check) { $forward += '--check' }
+if ($InstallOnly) { $forward += '--install-only' }
+if ($SkipBrowser) { $forward += '--skip-browser' }
+if ($env:VIDEO_PYTHON) {
+    if (-not (Test-Path -LiteralPath $env:VIDEO_PYTHON -PathType Leaf)) { throw 'VIDEO_PYTHON must point to an installed Python executable.' }
+    & $env:VIDEO_PYTHON bootstrap.py @forward
+} elseif (Get-Command py -ErrorAction SilentlyContinue) {
+    py -3 bootstrap.py @forward
+} elseif (Test-Path -LiteralPath '.venv\Scripts\python.exe') {
+    & '.venv\Scripts\python.exe' bootstrap.py @forward
+} else {
+    $pythonCommand = Get-Command python -ErrorAction SilentlyContinue
+    if (-not $pythonCommand -or $pythonCommand.Source -like '*WindowsApps*') {
+        Write-Host 'Python was not found. Install 64-bit Python 3.12 from https://www.python.org/downloads/'
+        Write-Host 'Enable Add python.exe to PATH. Reopen this launcher after installation.'
+        exit 1
     }
-    if ($LASTEXITCODE -ne 0) {
-        throw "Failed to create Python virtual environment. Please install Python 3.10 or newer."
-    }
+    & $pythonCommand.Source bootstrap.py @forward
 }
-
-. ".\.venv\Scripts\Activate.ps1"
-
-python -c "import importlib.metadata as m; from packaging.version import Version; import gradio, playwright, faster_whisper, yt_dlp, mcp; raise SystemExit(Version(m.version('gradio')) < Version('6.14') or Version(m.version('yt-dlp')) < Version('2026.6.9'))" *> $null
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Installing Python dependencies ..."
-    python -m pip install --upgrade pip
-    if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed." }
-
-    python -m pip install --upgrade -r requirements.txt
-    if ($LASTEXITCODE -ne 0) { throw "Dependency installation failed." }
-}
-
-Write-Host "Checking Playwright Chromium ..."
-python -m playwright install chromium
-if ($LASTEXITCODE -ne 0) {
-    throw "Playwright Chromium installation failed."
-}
-
-python app.py
+exit $LASTEXITCODE

@@ -26,3 +26,20 @@ tmp/
 
 # Local override
 .env
+.env.*
+!.env.example
+.data/
+.pytest_cache/
+test-results/
+.setup-logs/
+.setup.lock
+dist/
+REFACTOR_REPORT.md
+*.sqlite3*
+*.log
+*.pem
+*.key
+*.p12
+*.flac
+*.mkv
+*.webm

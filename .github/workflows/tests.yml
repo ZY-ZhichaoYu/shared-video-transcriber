@@ -1,0 +1,28 @@
+name: Core regression tests
+on:
+  push:
+  pull_request:
+jobs:
+  tests:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ['3.11', '3.14']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m unittest discover -s tests -v
+      - run: python -m pip check
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check static/app.js
+      - run: node --check static/features.js
+      - run: node --check static/local.js
+      - run: node --check static/diagnostics.js
+      - run: python scripts/package_source.py

@@ -1,10 +1,9 @@
-# Core
-playwright>=1.40
-faster-whisper>=1.0
+-c constraints.txt
+playwright>=1.40,<2
+faster-whisper>=1.2,<2
 yt-dlp>=2026.6.9
-
-# MCP server (server.py)
-mcp>=1.0
-
-# Web UI (app.py) — optional, only needed if you run the Gradio interface
-gradio>=6.14,<7
+mcp>=1.27,<2
+fastapi>=0.115,<1
+uvicorn>=0.30,<1
+pillow>=10,<13
+python-dotenv>=1.0,<2

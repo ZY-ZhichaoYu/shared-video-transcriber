@@ -1,407 +1,214 @@
-# 抖音 / Bilibili 视频转文字
+# 视频收件箱
 
-> 粘贴抖音或 Bilibili 链接，自动下载媒体，用本地 Whisper 转成文字稿。
-> 也可以只下载原视频到本机。
+朋友发来抖音或 Bilibili 链接，把视频变成可以快速阅读、回看和交给 AI 的资料。
 
-[English](#english) | [中文](#中文)
+这是一个本地优先的个人应用。新版使用独立网页 + FastAPI，替换了原先的 Gradio 界面，保留旧 MCP 工具。
 
----
+**第一次使用：** [下载源码 ZIP](https://github.com/ZY-ZhichaoYu/douyin-transcribe/archive/refs/heads/main.zip)，完整解压后启动。不需要 Git，不需要 AI key。
 
-## 中文
+| 你的电脑 | 启动方式 |
+|---|---|
+| Windows 10 / 11，64 位 | 先安装 [Python 3.12](https://www.python.org/downloads/) 并勾选 Add python.exe to PATH，然后双击 run_web.bat |
+| macOS / Linux | 安装 64 位 Python 3.10–3.14，在解压目录运行 bash run_web.sh |
 
-### 这是什么？
+这仍是源码版，不是免 Python 的 EXE。首次需要联网安装依赖、浏览器内核和选用的语音模型。
+只处理本地视频时，可用 python bootstrap.py --skip-browser 跳过网页内核下载。
+完整 Bilibili 视频合并另需 ffmpeg；未安装时，本地视频和仅转录仍可使用。
 
-这个项目适合这样的日常流程：
+遇到问题先双击 **check_environment.bat**，或在网页“设置”里点击“检查运行环境”。
+新手说明、常见报错和安全升级方法见 [使用指南](docs/GETTING_STARTED.md)。
 
-1. 别人发来一条抖音或 Bilibili 视频链接。
-2. 你不想完整看视频，只想要里面说了什么。
-3. 打开本地网页，把链接粘进去。
-4. 点击“开始转录”，拿到文字稿。
-5. 把文字稿发给 Claude / GPT / Gemini 做摘要、翻译、分析，或者自己快速阅读。
+## 怎么用
 
-支持：
+Windows 双击 **run_web.bat**。首次会创建虚拟环境、安装依赖和 Chromium，随后自动打开浏览器。
+默认 http://127.0.0.1:7860；端口占用时自动尝试 7861–7879。保持启动程序运行。
 
-- 抖音短链：`https://v.douyin.com/.../`
-- 抖音长链：`https://www.douyin.com/video/...`
-- 抖音 App 整段分享文本
-- Bilibili 视频：`https://www.bilibili.com/video/BV...`
-- Bilibili 短链：`https://b23.tv/...`（由 `yt-dlp` 解析）
+重复双击会打开同一结果目录已在运行的页面；文件锁阻止两个实例同时改写同一份任务库。
 
-也可以粘贴不带 `https://` 的裸域名链接，例如 `bilibili.com/video/BV...`，程序会自动补全。
+粘贴链接或整段分享文字，点击“开始处理”：
 
-### 界面里能做什么？
+| 方式 | 得到什么 | 取舍 |
+|---|---|---|
+| 只读文字 | 速览原话、时间戳文字稿、SRT 字幕 | 优先下载音频，适合日常浏览 |
+| 文字 + 画面 | 上述内容、原视频、最多 24 张带时间位置的抽样截图 | 下载更多数据；截图可点击回看 |
+| 只下载视频 | 当前可访问画质的原视频 | 不运行语音识别 |
 
-打开网页后主要有两个操作：
+默认“细致”使用 small，“快速”使用 base，“精细”使用 medium。较大的模型通常更准确，但不保证每段都更好；CPU 上会更慢。
+更多选项可以指定语言、填写专业名词提示、强制重新处理。
 
-- **开始转录**：下载适合转录的音频/视频流，然后用 `faster-whisper` 生成文字稿。
-- **下载视频**：只下载原视频，不转文字。抖音会下载可用 MP4；Bilibili 会优先下载 H.264/AVC 视频流和音频流并合并成 MP4。
+视频会保存到左侧历史。刷新网页不会停止后台任务。进度显示的是**当前阶段**：
+下载按实际字节更新；总大小未知时显示活动条和已下载大小，不编造百分比。
+B 站视频依次显示下载画面、下载声音、合并。转录按已识别的音频时间更新，预计剩余时间只是估计。
+首次模型加载/下载与排队显示独立状态。
 
-默认模型是 `base`。如果只想快速看大意，可以选 `tiny`；如果要更干净的文字稿，选 `small` 或 `medium`。
-注意：十几二十分钟的长视频在 CPU 上转录会明显变慢，尤其是 `medium`。日常使用建议先用 `base` 或 `small`，只有对准确率要求很高时再用 `medium`。
+取消为协作式：在当前请求、合并操作或语音片段结束后停止；模型首次下载期间也可能需要等待。
+关闭服务会中断任务；下次启动会把未完成记录标成“已中断”，可点击重新处理。
 
-### 运行前准备
+“导出笔记”下载 ZIP，包含 TXT、SRT、Markdown、结构化 JSON，以及视觉任务的截图。
+完整视频单独下载。ZIP 解压后 Markdown 可相对引用截图。
 
-Windows 用户建议先确认这些基础条件：
+## 纠错、复制与清理（2.1）
 
-```powershell
-python --version
-git --version
-```
+文字稿会标出建议复核的片段，可筛选后点“核对 / 修正”，定位原音并修改。
+这是模型低把握、重复或静音信号的提示，不是准确率；未标记的片段也可能出错。
+修订保留时间戳、首次原稿和每次修订前的完整记录；旧摘要会标记过期。
+“重新精细识别”复用本地音频，新旧稿分别保留。专业词提示用于辅助识别，不做全局强制替换。
+作者自造词、梗和口语应结合原音、原字幕核验，不能仅靠常识改写。
 
-需要：
+“复制给 AI”包含来源、时间戳和证据边界。“更多复制”可选纯文字、带时间戳、摘要，
+也可按顺序分段复制长文，不静默截断。画面需要单独复制拼图或下载上传，文字复制不会自动附图。
+含画面任务的拼图最多八张抽样截图，适合快速提供上下文，不是完整视频视觉理解。
 
-- Python 3.10 或更新版本（建议 64 位 Python）。
-- Git，用来下载或更新仓库。
-- 第一次运行需要联网下载 Python 依赖、Playwright Chromium 和 Whisper 模型。
-- 只“转文字”通常不需要手动安装 ffmpeg；如果要下载 Bilibili 完整 MP4，建议安装 ffmpeg：`winget install Gyan.FFmpeg`。
+“存储与清理”按任务展示空间占用，支持只删中间文件、删除音视频但保留截图、只留文字。
+必须先预览，再确认永久删除；任务历史、文字和修订记录保留。
+处理中、生成摘要或作为重识别音源的任务暂不清理。删除记录保存在本地 SQLite maintenance 表。
+可在提交前勾选完成后自动清理音视频（默认关闭）；失败任务不自动删除。
+清理后的音视频不能在应用内撤销，再次复听需重新下载，来源失效时可能无法恢复。
 
-### 如果你本地已经有这个项目
+## 本地录屏、会议与音频（2.2）
 
-最稳的方式是在资源管理器里双击 `run_web.bat`。它会自动创建 `.venv`、安装依赖、安装 Playwright Chromium，然后启动网页。
+切换到“电脑里的视频”，点击“选择文件”，或粘贴完整路径（Windows 资源管理器的“复制文件地址”）。
+支持 MP4、MKV、MOV、WebM、AVI，以及 WAV、M4A、MP3、FLAC 等音频。
+系统选择窗口不可用时，路径输入仍可使用；这指的是运行服务的电脑，不是另一台访问网页的设备。
 
-如果你想手动运行，Windows PowerShell 用下面这组命令。注意：这里不需要执行 `Activate.ps1`，可以避开 PowerShell 执行策略问题。
+本地原文件只读引用，不上传，也不复制整份大视频。应用只另存 16 kHz 单声道 FLAC 音轨、文字和抽样截图。
+音轨准备与语音识别分别显示阶段进度。播放器支持按字节范围读取大视频。
+原文件路径、大小和修改时间记录在本机数据库；原文件变动后不会悄悄播放或复用替换后的内容。
+原文件移动或删除后，已经保留的文字、截图和紧凑音轨仍可使用；原视频回看需要重新选择文件。
+应用缓存目录里的文件不允许作为“外部原文件”再次导入，请从历史重新识别。
 
-```powershell
-Set-Location C:\path\to\douyin-transcribe
-# 例如本机：Set-Location E:\ZY_Work_from_20260402\GitHub\douyin-transcribe
+可添加对应的 Bilibili/抖音链接，仅作来源记录，不再下载。可粘贴或读取 TXT 参考摘要，最多 8,000 字符，
+例如 Zoom summary；它与逐字稿分开保存和显示，复制给 AI 时标明是未核验的参考材料。
+导出包不包含原视频及本地绝对路径，参考材料另存 reference-notes.txt。
+本地任务的清理仅删除应用缓存，原视频永远不在该清理范围内。
+长会议仍需等待本机 CPU 识别；当前未做说话人分离、自动逐段语言检测或完整幻灯片 OCR。
 
-git pull
-if (!(Test-Path .\.venv\Scripts\python.exe)) { python -m venv .venv }
+## 安装
 
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install --upgrade -r requirements.txt
-.\.venv\Scripts\python.exe -m playwright install chromium
+需要 64 位 Python 3.10–3.14，推荐 3.12。完整 Bilibili 视频合并需要 ffmpeg；只转录一般不需要单独安装 ffmpeg。
 
-.\.venv\Scripts\python.exe app.py
-```
+    git clone https://github.com/ZY-ZhichaoYu/douyin-transcribe.git
+    cd douyin-transcribe
+    python -m venv .venv
+    .venv\Scripts\python.exe -m pip install -r requirements.txt
+    .venv\Scripts\python.exe -m playwright install chromium
+    .venv\Scripts\python.exe app.py
 
-然后打开：
+Windows 安装 ffmpeg：
 
-```text
-http://127.0.0.1:7860
-```
+    winget install Gyan.FFmpeg
 
-注意：运行 `app.py` 的终端窗口要保持打开。关掉终端，本地网页服务也会停止。
-如果 `7860` 端口已经被占用，程序会自动尝试 `7861`、`7862` 等后续端口，并在终端里打印实际地址。
+之后重新打开终端，让 PATH 生效。启动器直接使用虚拟环境 Python，不需要激活环境。
+macOS/Linux 可使用对应的 .venv/bin/python 手动启动。
 
-### 快捷启动
+## AI 摘要与看图
 
-本仓库带了两个快捷启动脚本：
+默认不调用付费 AI，不上传文字和画面。无 AI 配置时“速览”是按时间摘取的原话，界面明确标注，不冒充语义摘要。
 
-```text
-run_web.bat
-run_web.ps1
-```
+可以连接兼容 Chat Completions 的服务，包括本地模型。PowerShell 示例：
 
-最简单的方式是在资源管理器里双击 `run_web.bat`。它会进入项目目录，自动创建 `.venv`，补齐 Python 依赖，安装 Playwright Chromium，然后启动本地网页服务。
-第一次运行需要联网下载依赖和浏览器内核，时间会比较久；后续再启动会快很多。
+    $env:VIDEO_AI_BASE_URL = "https://你的服务/v1"
+    $env:VIDEO_AI_MODEL = "你的模型名称"
+    $env:VIDEO_AI_API_KEY = "你的密钥"
+    .\.venv\Scripts\python.exe app.py
 
-PowerShell 方式：
+本地服务地址允许 http://127.0.0.1；云端必须 HTTPS。模型名和能力由所选服务决定，项目不预设某个付费供应商。
+也可以复制项目里的 .env.example 为 .env，取消需要的配置项前的注释并填写，随后重启。
+已有进程环境变量优先于 .env；配置不进行变量展开。勿把 .env、密钥、视频或会议文字发到 GitHub。
 
-```powershell
-Set-Location C:\path\to\douyin-transcribe
-.\run_web.ps1
-```
+完成任务后点击“生成 AI 摘要”，界面会显示目标服务并确认发送。
+逐字稿最多发送前 45,000 字符，截断时结果会注明；如附参考摘要，会另行发送最多 8,000 字符并区分来源。勾选发送画面时，最多发送 8 张抽样图，需要支持图片输入的模型。
+AI 输出包括一句话内容、带时间位置的要点、建议回看的位置和适当的回复草稿。
+原始文字稿保持独立，AI 失败不会丢失转录。
 
-如果 PowerShell 提示脚本执行策略限制，改用下面这个命令，或直接双击 `run_web.bat`：
+抽样截图不是完整视频理解。短暂字幕、快速动作和转场可能遗漏；目前没有 OCR、场景变化检测或逐帧动作分析。
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\run_web.ps1
-```
+## AI 调用：MCP、HTTP、Skill
 
-### 第一次全新安装
-
-如果这台电脑上还没有仓库：
-
-```powershell
-git clone https://github.com/ZY-ZhichaoYu/douyin-transcribe.git
-cd douyin-transcribe
-
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install --upgrade -r requirements.txt
-.\.venv\Scripts\python.exe -m playwright install chromium
-
-.\.venv\Scripts\python.exe app.py
-```
-
-如果不想安装 Git，也可以在 GitHub 页面点 **Code → Download ZIP**，解压后进入文件夹，双击 `run_web.bat`。
-
-第一次转录会自动下载 Whisper 模型：
-
-- Web UI 默认 `base`，约 74MB。
-- MCP 工具默认 `tiny`，约 39MB，便于更快返回。
-
-### 常用操作
-
-#### 抖音转文字
-
-1. 复制抖音 App 分享文本，整段都可以。
-2. 粘贴到“视频链接 / 分享文本”。
-3. 模型默认 `base`。
-4. 点击“开始转录”。
-5. 右侧“文字稿（可复制）”出现结果后，复制给 AI 或自己阅读。
-
-#### Bilibili 转文字
-
-1. 复制 Bilibili 视频链接，例如 `https://www.bilibili.com/video/BV...`。
-2. 粘贴到同一个输入框。
-3. 点击“开始转录”。
-
-Bilibili 转录会优先下载音频流，速度通常比下载完整视频更快。
-
-#### 下载视频
-
-在“转文字”页或“仅下载视频”页都可以点“下载视频 / 下载（最高画质）”。
-
-下载完成后会看到：
-
-- 浏览器里的下载文件控件。
-- 本地文件路径，例如 `C:\Users\...\AppData\Local\Temp\video_dl_xxx\xxx.mp4`。
-
-文件保存在系统临时目录，不会立刻自动删除；需要长期保存时，可以把它移动到自己的视频目录。
-
-### 依赖说明
-
-核心依赖：
-
-- `playwright`：抖音页面抓取和接口拦截。
-- `yt-dlp`：Bilibili 下载和格式解析。
-- `ffmpeg`：Bilibili 视频流 + 音频流合并成 MP4 时需要。
-- `faster-whisper`：本地语音识别。
-- `gradio`：本地网页界面。
-
-检查依赖：
-
-```powershell
-.\.venv\Scripts\python.exe -c "import gradio, playwright, faster_whisper, yt_dlp, mcp; print('ok')"
-ffmpeg -version
-```
-
-如果 `ffmpeg -version` 不存在，Bilibili 转文字通常仍可工作，因为它只下载音频；但 Bilibili “下载视频”可能无法把视频流和音频流合并成一个 MP4。Windows 可以安装 Gyan.dev 或 `winget install Gyan.FFmpeg`。
-
-### MCP 用法
-
-`server.py` 仍然可以作为 MCP server 使用。
-
-Claude Desktop 配置示例：
-
-```json
-{
-  "mcpServers": {
-    "douyin": {
-      "command": "python",
-      "args": ["C:\\path\\to\\douyin-transcribe\\server.py"]
-    }
-  }
-}
-```
-
-可用工具：
+新 MCP 工具与网页共享持久任务，需要先启动 app.py：
 
 | 工具 | 用途 |
-|------|------|
-| `analyze_video(url)` | 通用同步转录，支持抖音和 Bilibili |
-| `video_to_text(url)` | 通用异步转录，返回 `job_id` |
-| `get_transcript_result(job_id)` | 获取异步任务结果 |
-| `download_video(url)` | 通用下载视频，支持抖音和 Bilibili |
-| `transcribe_video(file_path)` | 转录本地视频或音频文件 |
-| `analyze_douyin(url)` | 兼容旧工具名，现在也可处理 Bilibili |
-| `douyin_to_text(url)` | 兼容旧工具名，现在也可处理 Bilibili |
-| `download_douyin(url)` | 兼容旧工具名，现在也可处理 Bilibili |
+|---|---|
+| inspect_shared_video(url, mode, profile) | 创建/复用任务，立即返回 id |
+| get_video_job(job_id) | 查询状态、时间戳文字、画面和文件 URL；可重复读取 |
+| cancel_video_job(job_id) | 请求取消 |
+| inspect_local_video(path, mode, profile, language, hotwords, reference_url, context_notes) | 只读分析用户选定的本地视频或音频 |
+| get_video_handoff(job_id, format, max_chars) | 完整文字资料与不丢内容的有序分段 |
 
-如果 MCP 客户端容易超时，优先用异步流程：
+mode 为 transcript / visual / download；profile 为 fast / balanced / accurate。
+先创建，再每隔约 2 秒查询，直到 status 为 done / error / cancelled / interrupted。
 
-1. 调 `video_to_text(url)`，拿到 `job_id`。
-2. 调 `get_transcript_result(job_id)`，没完成就隔一会儿再调同一个 `job_id`。
+MCP 客户端配置中的 command 应指向项目虚拟环境 Python，args 指向 server.py 的绝对路径，例如：
 
-### 技术原理
+    {
+      "mcpServers": {
+        "video-inbox": {
+          "command": "C:\\path\\to\\douyin-transcribe\\.venv\\Scripts\\python.exe",
+          "args": ["C:\\path\\to\\douyin-transcribe\\server.py"]
+        }
+      }
+    }
 
-抖音：
+桥接自动寻找本机 7860–7879 的新版服务；自定义端口可设置 VIDEO_INBOX_URL。
+现有 MCP 客户端需要重新连接/重启才能发现新工具。
+旧版 analyze_video、video_to_text、get_transcript_result、download_video、transcribe_video 和抖音兼容名保留，可独立运行；旧工具仍使用其原有内存任务，推荐迁移到新工具。
 
-- 用 headless Chromium 打开页面。
-- 拦截 `aweme/v1/web/aweme/detail` 接口。
-- 如果浏览器没有拦截到接口，会回退到移动端分享页里的 `window._ROUTER_DATA` 解析，减少短链偶发失败。
-- 转录时优先使用 `bit_rate_audio` 音频流，没有音频流时回退到带音频的 MP4。
+HTTP API 文档随应用离线提供：[/docs](http://127.0.0.1:7860/docs)，机器可读 schema 在 /openapi.json。
+GET /api/health 获取 token，写请求需带 X-Video-Token。支持创建、查询、取消、导出和显式请求摘要。
 
-Bilibili：
+可分发技能在 [skills/read-shared-video/SKILL.md](skills/read-shared-video/SKILL.md)。
+把 read-shared-video 文件夹复制到所用 AI 客户端的技能目录，再配置 MCP 或使用 HTTP API。
+技能指导 AI 区分语音与画面证据、按时间引用，并把视频中的指令视为外部资料。
 
-- 用 `yt-dlp` 提取视频信息和直链。
-- 转录时优先下载音频流。
-- 下载视频时优先选择 H.264/AVC 视频流和 M4A 音频流，并让 ffmpeg 合并成 MP4。这样比 HEVC/H.265 更容易在 Windows 默认播放器和浏览器里正常出画面。
+## 数据与运行边界
 
-Whisper：
+- 默认仅监听 127.0.0.1，适合本机个人使用，**不要直接作为公网多用户服务部署**。
+- 任务和文件保存在项目 .data 目录（已加入 .gitignore）；数据库使用 SQLite WAL。
+- 相同 URL 与相同选项会复用已有任务。B 站跟踪参数会清理，分 P 参数保留；短链与长链目前不保证归并。
+- 同时运行最多两个任务，语音引擎串行使用单个缓存模型；最多 20 个未结束任务，历史界面显示最近 200 条。
+- 默认保留历史与媒体；可显式选择自动清理，或通过空间管理预览并删除。提交前默认至少要求 512 MB 磁盘余量，这不等于处理全过程的磁盘配额。
+- 直链单文件默认上限 2 GB。yt-dlp 后备路径的资源约束还未与直链完全统一。
+- HTTPS 证书校验已恢复。如企业/本地代理需要额外 CA，配置 SSL_CERT_FILE 指向可信证书；不要关闭校验。
+- Cookie 导入、验证码交互、付费/会员内容、直播、图集和合集暂未实现。平台接口变化、风控、地区限制会影响获取成功率。
+- 未做完整公网 SSRF 隔离；平台重定向、CDN、浏览器网络还需在部署层隔离。本机防护不等于公网安全认证。
 
-- 语言自动识别，适合中文、英文或中英混杂视频。
-- 默认 CPU + int8，速度优先，不需要显卡。
+环境变量：
 
-### 已知限制
+| 变量 | 用途 |
+|---|---|
+| VIDEO_PORT | 指定本地端口；兼容旧 GRADIO_SERVER_PORT |
+| VIDEO_OPEN_BROWSER=0 | 不自动打开浏览器 |
+| VIDEO_DATA_DIR | 指定结果和数据库目录 |
+| VIDEO_MAX_DOWNLOAD_MB | 直链单文件上限，默认 2048 |
+| VIDEO_MIN_FREE_MB | 提交任务前最低磁盘余量，默认 512 |
+| VIDEO_WHISPER_DEVICE | 默认 cpu；具备合适 CUDA 环境时可设 cuda |
+| VIDEO_WHISPER_COMPUTE | 默认 CPU int8 / CUDA float16 |
+| VIDEO_AI_BASE_URL / VIDEO_AI_MODEL / VIDEO_AI_API_KEY | 可选 AI 配置 |
+| VIDEO_INBOX_URL | MCP 桥接到指定本地实例 |
+| VIDEO_PYTHON | Windows 启动器使用的 Python 可执行文件完整路径（通常无需设置） |
 
-- 主要测试单视频链接。合集、图集、直播回放不保证。
-- Bilibili 未登录时通常只能拿到游客可看的清晰度；1080P、4K、会员视频需要 cookies，本项目暂未做登录/cookies 导入界面。
-- 抖音或 Bilibili 修改网页接口时，抓取可能失效，需要更新代码或 `yt-dlp`。
-- 语音识别质量取决于音频质量、背景音乐、多人重叠、模型大小。
+## 验证与后续
 
-### 常见问题
+    .venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+    .venv\Scripts\python.exe -m unittest discover -s tests -v
+    node --check static/app.js
+    node --check static/features.js
 
-**Q: 打开 `127.0.0.1:7860` 显示 refused to connect？**
-A: 本地服务没跑。先双击 `run_web.bat`，或在项目目录执行 `.\.venv\Scripts\python.exe app.py`，并保持终端打开。
+Node 仅用于可选的 JavaScript 语法检查，运行网页不需要 Node。
 
-**Q: 报 `python` 不是内部或外部命令？**
-A: 这台电脑没有正确安装 Python，或没有把 Python 加到 PATH。安装 64 位 Python 3.10 或更新版本；安装时勾选 “Add python.exe to PATH”。装好后重新打开终端，再执行 `python --version`。
-
-**Q: 报 `git` 不是内部或外部命令？**
-A: 没装 Git。可以安装 Git for Windows，或者不使用命令行：在 GitHub 页面点 **Code → Download ZIP**，解压后双击 `run_web.bat`。
-
-**Q: 运行时报 `Cannot find empty port in range: 7860-7860`？**
-A: 旧版本会固定占用 `7860`。更新后请先 `git pull`，再重新运行；如果 `7860` 被占用，程序会自动换到下一个可用端口。也可以手动指定：
-```powershell
-$env:GRADIO_SERVER_PORT = "7861"
-.\.venv\Scripts\python.exe app.py
-```
-
-**Q: 进度条停在转录中，是不是卡死了？**
-A: 不一定。下载完成后进入 Whisper 转录，CPU 上处理长视频会很慢，`medium` 最慢。20 分钟视频建议先用 `base` 或 `small`，确认内容够用后再考虑 `medium`。
-
-**Q: Playwright 报 browser executable 不存在？**
-A: 执行：
-
-```powershell
-.\.venv\Scripts\python.exe -m playwright install chromium
-```
-
-**Q: PowerShell 报 `running scripts is disabled on this system`？**
-A: 不要执行 `Activate.ps1`。最简单是双击 `run_web.bat`；如果要用 PowerShell 脚本，执行：
-```powershell
-powershell -ExecutionPolicy Bypass -File .\run_web.ps1
-```
-
-**Q: 报 `ModuleNotFoundError: No module named ...`？**
-A: 依赖没有装到当前 Python 环境。回到项目目录，执行：
-```powershell
-.\.venv\Scripts\python.exe -m pip install --upgrade -r requirements.txt
-.\.venv\Scripts\python.exe -m playwright install chromium
-.\.venv\Scripts\python.exe app.py
-```
-
-**Q: Bilibili 下载视频失败，但转文字可以？**
-A: 多数是没有 ffmpeg，导致视频流和音频流不能合并。执行 `ffmpeg -version` 检查。
-
-**Q: 下载的 MP4 只有声音，没有画面？**
-A: 多数是播放器不支持 HEVC/H.265。当前版本已优先下载 H.264/AVC 格式；先 `git pull` 后重新下载。如果仍有问题，可以换 VLC 播放器验证。
-
-**Q: 转录结果错字很多？**
-A: 先把模型从 `tiny` 或 `base` 调到 `small`。财经、技术、英文夹杂视频建议至少用 `base` 或 `small`。
-
-**Q: 为什么下载的视频在 Temp 目录？**
-A: 这是为了不污染项目目录。下载完成后界面会显示本地路径，需要长期保存时手动移动即可。
-
-### 致谢
-
-- [Playwright](https://playwright.dev/)
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp)
-- [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
-- [Gradio](https://www.gradio.app/)
-- [Model Context Protocol](https://modelcontextprotocol.io/)
-
-### 许可证
-
-MIT License，见 [LICENSE](./LICENSE)。
-
----
+发布范围和仍需完成的工作见 [CHANGELOG.md](CHANGELOG.md) 与 [发布验收说明](docs/RELEASE_CHECKLIST.md)。
+关键直接依赖和原生组件版本受 constraints.txt 约束；它不是完整的跨平台依赖锁文件。
+尚无跨视频准确率基准；一次成功不能代表平台总体成功率。
 
 ## English
 
-### What Is This?
+A local-first video inbox for Douyin and Bilibili. Paste a shared link, read timestamped speech,
+optionally retain source video and sampled frames, and export TXT/SRT/Markdown/JSON.
+FastAPI serves a responsive, build-free frontend. SQLite persists jobs; the existing MCP tools remain compatible.
+The new inspect_shared_video/get_video_job tools share tasks with the running app.
+Optional AI summaries use an explicitly configured OpenAI-compatible endpoint, with user-confirmed transcript/image transfer.
+This release targets personal local use, not public multi-tenant deployment.
 
-This is a local web app and MCP server that turns Douyin or Bilibili videos into text.
-Paste a video URL, download the media locally, transcribe it with faster-whisper, then copy the transcript into an AI model for summary or analysis.
-
-Supported inputs:
-
-- Douyin short links: `https://v.douyin.com/.../`
-- Douyin video URLs: `https://www.douyin.com/video/...`
-- Full Douyin app share text
-- Bilibili BV URLs: `https://www.bilibili.com/video/BV...`
-- Bilibili short links: `https://b23.tv/...`
-
-Bare URLs without `https://`, such as `bilibili.com/video/BV...`, are accepted and normalized automatically.
-
-### Quick Start
-
-Prerequisites:
-
-- Python 3.10 or newer, preferably 64-bit.
-- Git.
-- Internet access for the first dependency, Playwright Chromium, and Whisper model downloads.
-- ffmpeg is usually optional for transcription, but recommended for downloading complete Bilibili MP4 files: `winget install Gyan.FFmpeg`.
-
-On Windows, the simplest path is to double-click `run_web.bat`. It creates `.venv` if needed, installs Python dependencies, installs Playwright Chromium, then starts the local web server.
-
-If you prefer manual PowerShell commands, use the project virtual environment directly. You do not need to run `Activate.ps1`.
-
-```powershell
-Set-Location C:\path\to\douyin-transcribe
-git pull
-
-if (!(Test-Path .\.venv\Scripts\python.exe)) { python -m venv .venv }
-
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install --upgrade -r requirements.txt
-.\.venv\Scripts\python.exe -m playwright install chromium
-
-.\.venv\Scripts\python.exe app.py
-```
-
-Then open:
-
-```text
-http://127.0.0.1:7860
-```
-
-Keep the `app.py` server terminal open while using the web UI.
-If port `7860` is already busy, the app will automatically try the next available port and print the actual local URL in the terminal.
-
-For a brand-new download:
-
-```powershell
-git clone https://github.com/ZY-ZhichaoYu/douyin-transcribe.git
-cd douyin-transcribe
-.\run_web.bat
-```
-
-If PowerShell blocks scripts with `running scripts is disabled on this system`, use `run_web.bat` or run:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\run_web.ps1
-```
-
-### Dependencies
-
-- Playwright for Douyin browser capture
-- yt-dlp for Bilibili extraction and download
-- ffmpeg for merging Bilibili video and audio into MP4
-- faster-whisper for local transcription
-- Gradio for the web UI
-
-### MCP Tools
-
-| Tool | Purpose |
-|------|---------|
-| `analyze_video(url)` | Synchronous transcript for Douyin or Bilibili |
-| `video_to_text(url)` | Start async transcription and return a job id |
-| `get_transcript_result(job_id)` | Poll async transcription result |
-| `download_video(url)` | Download source video |
-| `transcribe_video(file_path)` | Transcribe a local media file |
-
-Legacy tool names (`analyze_douyin`, `douyin_to_text`, `download_douyin`) are kept for compatibility.
-
-### Notes
-
-For long videos on CPU, `medium` can take a long time. Start with `base` or `small` for everyday use, then rerun with `medium` only when you need the extra accuracy.
-
-Douyin extraction first tries the browser-captured detail API. If that fails, it falls back to parsing `window._ROUTER_DATA` from the mobile share page.
-
-Bilibili downloads use yt-dlp. Guest access may only expose lower resolutions; premium or login-only formats need cookies, which this UI does not manage yet.
-
-MIT License. See [LICENSE](./LICENSE).
+MIT license. Built with [faster-whisper](https://github.com/SYSTRAN/faster-whisper),
+[yt-dlp](https://github.com/yt-dlp/yt-dlp), [Playwright](https://playwright.dev/python/),
+[FastAPI](https://fastapi.tiangolo.com/) and [MCP](https://github.com/modelcontextprotocol/python-sdk).
