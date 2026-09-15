@@ -4,7 +4,7 @@
 
 这是一个本地优先的个人应用。新版使用独立网页 + FastAPI，替换了原先的 Gradio 界面，保留旧 MCP 工具。
 
-**第一次使用：** [下载源码 ZIP](https://github.com/ZY-ZhichaoYu/douyin-transcribe/archive/refs/heads/main.zip)，完整解压后启动。不需要 Git，不需要 AI key。
+**第一次使用：** [下载源码 ZIP](https://github.com/ZY-ZhichaoYu/video-inbox/archive/refs/heads/main.zip)，完整解压后启动。不需要 Git，不需要 AI key。
 
 | 你的电脑 | 启动方式 |
 |---|---|
@@ -87,8 +87,8 @@ B 站视频依次显示下载画面、下载声音、合并。转录按已识别
 
 需要 64 位 Python 3.10–3.14，推荐 3.12。完整 Bilibili 视频合并需要 ffmpeg；只转录一般不需要单独安装 ffmpeg。
 
-    git clone https://github.com/ZY-ZhichaoYu/douyin-transcribe.git
-    cd douyin-transcribe
+    git clone https://github.com/ZY-ZhichaoYu/video-inbox.git
+    cd video-inbox
     python -m venv .venv
     .venv\Scripts\python.exe -m pip install -r requirements.txt
     .venv\Scripts\python.exe -m playwright install chromium
@@ -143,8 +143,8 @@ MCP 客户端配置中的 command 应指向项目虚拟环境 Python，args 指�
     {
       "mcpServers": {
         "video-inbox": {
-          "command": "C:\\path\\to\\douyin-transcribe\\.venv\\Scripts\\python.exe",
-          "args": ["C:\\path\\to\\douyin-transcribe\\server.py"]
+          "command": "C:\\path\\to\\video-inbox\\.venv\\Scripts\\python.exe",
+          "args": ["C:\\path\\to\\video-inbox\\server.py"]
         }
       }
     }
