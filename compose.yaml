@@ -1,0 +1,22 @@
+services:
+  login:
+    image: shared-video-transcriber:ci
+    command: login
+    environment:
+      - R2_ENDPOINT
+      - R2_BUCKET
+      - R2_ACCESS_KEY_ID
+      - R2_SECRET_ACCESS_KEY
+      - PROFILE_ENCRYPTION_KEY
+      - R2_PROFILE_PREFIX
+      - NETWORK_MODE=direct
+    ports:
+      - "127.0.0.1:6080:6080"
+    volumes:
+      - ./.runtime/docker:/data
+    shm_size: 1gb
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - seccomp=unconfined
+    init: true

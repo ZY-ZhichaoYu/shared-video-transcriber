@@ -1,0 +1,7 @@
+**
+!Cargo.toml
+!Cargo.lock
+!src/
+!src/**
+!config/
+!config/browser.ini

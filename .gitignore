@@ -43,3 +43,13 @@ REFACTOR_REPORT.md
 *.flac
 *.mkv
 *.webm
+
+# Rust / Docker runtime
+/target/
+/.runtime/
+*.age
+
+/.wrangler/
+
+.runtime/
+.wrangler/

@@ -1,0 +1,118 @@
+name: Douyin to Telegram transcript
+on:
+  workflow_call:
+    inputs:
+      url:
+        required: true
+        type: string
+      chat_id:
+        required: true
+        type: string
+      request_id:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 抖音分享链接
+        required: true
+        type: string
+      chat_id:
+        description: 收取文字稿的 Telegram 用户 ID（须在允许名单中）
+        required: true
+        type: string
+      request_id:
+        description: Telegram update ID 或手工任务编号
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: douyin-profile
+  cancel-in-progress: false
+  queue: max
+jobs:
+  transcribe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Load this application's secrets
+        env:
+          INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
+          INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+          INFISICAL_PROJECT_ID: ${{ vars.INFISICAL_PROJECT_ID }}
+          INFISICAL_ENVIRONMENT: ${{ vars.INFISICAL_ENVIRONMENT }}
+          INFISICAL_API_URL: ${{ vars.INFISICAL_API_URL }}
+          INFISICAL_SECRET_PATH: ${{ secrets.INFISICAL_SECRET_PATH }}
+        run: |
+          bash scripts/install-infisical.sh
+          node scripts/ci-secrets.mjs
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        id: image
+        with:
+          context: .
+          load: true
+          tags: shared-video-transcriber:job
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - uses: actions/cache@v4
+        with:
+          path: /tmp/video-models
+          key: whisper-cpp-v1.9.5-small
+      - name: Prepare speech model before switching exit node
+        run: |
+          mkdir -p /tmp/video-models
+          chmod 777 /tmp/video-models
+          if [ ! -s /tmp/video-models/ggml-small.bin ]; then
+            docker run --rm -v /tmp/video-models:/models shared-video-transcriber:job model small
+          fi
+      - uses: tailscale/github-action@v4
+        id: tailscale
+        with:
+          oauth-client-id: ${{ env.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ env.TS_OAUTH_SECRET }}
+          tags: ${{ env.TAILSCALE_TAGS }}
+          version: '1.104.7'
+      - name: Select the mainland exit after joining the tailnet
+        run: sudo tailscale set --exit-node="$TAILSCALE_EXIT_NODE" --exit-node-allow-lan-access=false
+      - name: Prepare private result directory
+        run: mkdir -m 777 /tmp/douyin-results
+      - name: Transcribe through the mainland exit node
+        id: transcript
+        continue-on-error: true
+        env:
+          VIDEO_INPUT: ${{ inputs.url }}
+          NETWORK_MODE: tailscale
+          VIDEO_RESULT_DIR: /results
+        run: |
+          docker run --rm --name douyin-job --network host --cap-add=SYS_ADMIN --security-opt seccomp=unconfined \
+            -v /tmp/video-models:/models:ro -v /tmp/douyin-results:/results \
+            -v /var/run/tailscale:/var/run/tailscale:ro -v "$(command -v tailscale):/usr/local/bin/tailscale:ro" \
+            -e R2_ENDPOINT -e R2_BUCKET -e R2_ACCESS_KEY_ID -e R2_SECRET_ACCESS_KEY \
+            -e PROFILE_ENCRYPTION_KEY -e R2_PROFILE_PREFIX -e VIDEO_INPUT -e VIDEO_RESULT_DIR \
+            -e NETWORK_MODE -e TAILSCALE_EXIT_NODE shared-video-transcriber:job transcribe-job
+      - name: Finish Douyin networking before Telegram delivery
+        if: always() && steps.tailscale.outcome == 'success'
+        run: sudo tailscale set --exit-node=
+      - name: Deliver TXT, SRT and JSON or explain the failure
+        if: always() && steps.image.outcome == 'success'
+        env:
+          TELEGRAM_CHAT_ID: ${{ inputs.chat_id }}
+          VIDEO_RESULT_DIR: /results
+        run: |
+          docker run --rm --network host -v /tmp/douyin-results:/results:ro \
+            -e TELEGRAM_BOT_TOKEN -e TELEGRAM_ALLOWED_USER_IDS -e TELEGRAM_CHAT_ID -e VIDEO_RESULT_DIR \
+            shared-video-transcriber:job telegram-deliver
+      - name: Remove job container and temporary data
+        if: always()
+        run: |
+          docker rm -f douyin-job >/dev/null 2>&1 || true
+          find /tmp/douyin-results -type f -delete 2>/dev/null || true
+      - name: Preserve transcription failure status
+        if: always() && steps.transcript.outcome != 'success'
+        run: exit 1
