@@ -36,6 +36,8 @@ enum Action {
     Upload,
     /// 从 R2 恢复完整登录档案到空数据目录
     Restore,
+    /// 在全新运行环境恢复档案并检查真实抖音登录
+    SessionCheck,
     /// 抖音分享文字转成 TXT / SRT / JSON
     Transcribe {
         input: String,
@@ -89,6 +91,15 @@ fn execute(cli: Cli) -> Result<()> {
         Action::Restore => {
             network::check()?;
             Store::load()?.restore(&config)
+        }
+        Action::SessionCheck => {
+            network::check()?;
+            Store::load()?.restore(&config)?;
+            let mut browser = Browser::open(&config, false)?;
+            media::verify_login(&mut browser)?;
+            browser.close()?;
+            println!("R2 完整档案恢复和抖音登录检查通过");
+            Ok(())
         }
         Action::Transcribe {
             input,

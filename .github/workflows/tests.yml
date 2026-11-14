@@ -78,6 +78,7 @@ jobs:
           compression-level: 0
           retention-days: 7
   configuration:
+    needs: docker
     if: github.event_name == 'push' && vars.DOUYIN_SETUP_CHECK == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -106,3 +107,21 @@ jobs:
           version: '1.104.7'
       - name: Check live exit node, Worker and Telegram identity
         run: node scripts/check-deployment.mjs
+      - uses: actions/download-artifact@v4
+        with:
+          name: docker-login-image
+          path: /tmp/login-image
+      - name: Restore the real encrypted profile on a new runner
+        env:
+          NETWORK_MODE: tailscale
+        run: |
+          docker load --input /tmp/login-image/login-image.tar.gz
+          sudo tailscale set --exit-node="$TAILSCALE_EXIT_NODE" --exit-node-allow-lan-access=false
+          docker run --rm --network host --cap-add=SYS_ADMIN --security-opt seccomp=unconfined \
+            -v /var/run/tailscale:/var/run/tailscale:ro -v "$(command -v tailscale):/usr/local/bin/tailscale:ro" \
+            -e R2_ENDPOINT -e R2_BUCKET -e R2_ACCESS_KEY_ID -e R2_SECRET_ACCESS_KEY \
+            -e PROFILE_ENCRYPTION_KEY -e R2_PROFILE_PREFIX -e NETWORK_MODE -e TAILSCALE_EXIT_NODE \
+            shared-video-transcriber:ci session-check
+      - name: Finish the profile check's exit node stage
+        if: always()
+        run: sudo tailscale set --exit-node= || true
