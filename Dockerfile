@@ -1,9 +1,9 @@
 FROM rust:1.92-bookworm AS rust-build
 WORKDIR /build
-COPY Cargo.toml ./
+COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 COPY config ./config
-RUN cargo build --release
+RUN cargo build --locked --release
 
 FROM debian:bookworm-slim AS whisper-build
 ARG WHISPER_VERSION=v1.9.5
@@ -17,9 +17,9 @@ RUN mkdir -p /usr/share/novnc && curl -fsSL https://github.com/novnc/noVNC/archi
 
 COPY --from=rust-build /build/target/release/shared-video-transcriber /usr/local/bin/shared-video-transcriber
 COPY --from=whisper-build /whisper/build/bin/whisper-cli /usr/local/bin/whisper-cli
-RUN useradd -m -u 1000 video && mkdir -p /data /models && chown video:video /data /models
-USER video
-WORKDIR /home/video
+RUN useradd -m -u 1000 transcriber && mkdir -p /data /models && chown transcriber:transcriber /data /models
+USER transcriber
+WORKDIR /home/transcriber
 ENV VIDEO_DATA_DIR=/data WHISPER_MODEL=/models/ggml-small.bin
 EXPOSE 6080
 ENTRYPOINT ["shared-video-transcriber"]

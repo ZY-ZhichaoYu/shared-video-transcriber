@@ -19,9 +19,9 @@ jobs:
             ~/.cargo/git
             target
           key: rust-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock') }}
-      - run: cargo fmt --all
-      - run: cargo test --all-targets
-      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo fmt --all -- --check
+      - run: cargo test --locked --all-targets
+      - run: cargo clippy --locked --all-targets -- -D warnings
       - name: Export generated lock and formatting
         if: always()
         uses: actions/upload-artifact@v4
@@ -66,3 +66,13 @@ jobs:
           docker run --rm -v /tmp/video-models:/models -e WHISPER_MODEL=/models/ggml-tiny.bin shared-video-transcriber:ci model tiny
           docker run --rm -v /tmp/video-models:/models -v /tmp/video-input:/input:ro -e WHISPER_MODEL=/models/ggml-tiny.bin shared-video-transcriber:ci transcribe --file --language en /input/jfk.wav | tee /tmp/transcript.txt
           grep -qi 'country' /tmp/transcript.txt
+      - name: Package login image built by remote CI
+        if: github.event_name == 'push'
+        run: docker save shared-video-transcriber:ci | gzip > login-image.tar.gz
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'push'
+        with:
+          name: docker-login-image
+          path: login-image.tar.gz
+          compression-level: 0
+          retention-days: 7
