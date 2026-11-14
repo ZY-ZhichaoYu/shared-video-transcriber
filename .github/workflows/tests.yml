@@ -125,3 +125,11 @@ jobs:
       - name: Finish the profile check's exit node stage
         if: always()
         run: sudo tailscale set --exit-node= || true
+  acceptance:
+    if: github.event_name == 'push' && vars.DOUYIN_TEST_URL != ''
+    uses: ./.github/workflows/transcribe.yml
+    with:
+      url: ${{ vars.DOUYIN_TEST_URL }}
+      chat_id: '5909140623'
+      request_id: acceptance-${{ github.run_id }}
+    secrets: inherit

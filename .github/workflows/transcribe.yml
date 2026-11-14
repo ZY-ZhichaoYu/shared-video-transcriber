@@ -1,5 +1,16 @@
 name: Douyin to Telegram transcript
 on:
+  workflow_call:
+    inputs:
+      url:
+        required: true
+        type: string
+      chat_id:
+        required: true
+        type: string
+      request_id:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       url:
