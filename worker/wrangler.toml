@@ -1,0 +1,8 @@
+name = "douyin-transcriber-webhook"
+main = "index.js"
+compatibility_date = "2026-11-13"
+
+[vars]
+GITHUB_REPOSITORY = "C0verSnow/shared-video-transcriber"
+GITHUB_REF = "main"
+GITHUB_WORKFLOW = "transcribe.yml"

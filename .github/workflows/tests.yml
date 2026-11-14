@@ -1,28 +1,68 @@
-name: Core regression tests
+name: Rust and Docker checks
 on:
   push:
   pull_request:
+permissions:
+  contents: read
 jobs:
-  tests:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        python: ['3.11', '3.14']
-    runs-on: ${{ matrix.os }}
+  rust:
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          python-version: ${{ matrix.python }}
-          cache: pip
-      - run: python -m pip install -r requirements-dev.txt
-      - run: python -m unittest discover -s tests -v
-      - run: python -m pip check
+          components: rustfmt, clippy
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: rust-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock') }}
+      - run: cargo fmt --all
+      - run: cargo test --all-targets
+      - run: cargo clippy --all-targets -- -D warnings
+      - name: Export generated lock and formatting
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-generated
+          path: |
+            Cargo.lock
+            src/*.rs
+            tests/*.rs
+      - name: Require a Python-free source tree
+        run: test -z "$(git ls-files '*.py' '*.pyc' 'requirements*.txt')"
+  webhook:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check static/app.js
-      - run: node --check static/features.js
-      - run: node --check static/local.js
-      - run: node --check static/diagnostics.js
-      - run: python scripts/package_source.py
+      - run: node --test worker/tests/*.test.js
+  docker:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: shared-video-transcriber:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Check Rust CLI and real headed Chromium
+        run: |
+          docker run --rm shared-video-transcriber:ci --help
+          docker run --rm --cap-add=SYS_ADMIN --security-opt seccomp=unconfined shared-video-transcriber:ci browser-check
+      - name: Transcribe real sample audio using the packaged whisper.cpp
+        run: |
+          mkdir -p /tmp/video-models /tmp/video-input
+          chmod 777 /tmp/video-models
+          curl -fsSL --retry 3 https://raw.githubusercontent.com/ggml-org/whisper.cpp/v1.9.5/samples/jfk.wav -o /tmp/video-input/jfk.wav
+          docker run --rm -v /tmp/video-models:/models -e WHISPER_MODEL=/models/ggml-tiny.bin shared-video-transcriber:ci model tiny
+          docker run --rm -v /tmp/video-models:/models -v /tmp/video-input:/input:ro -e WHISPER_MODEL=/models/ggml-tiny.bin shared-video-transcriber:ci transcribe --file --language en /input/jfk.wav | tee /tmp/transcript.txt
+          grep -qi 'country' /tmp/transcript.txt
