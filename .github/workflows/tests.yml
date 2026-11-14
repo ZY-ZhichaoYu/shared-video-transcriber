@@ -76,3 +76,32 @@ jobs:
           path: login-image.tar.gz
           compression-level: 0
           retention-days: 7
+  configuration:
+    if: github.event_name == 'push' && vars.DOUYIN_SETUP_CHECK == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Load configured application and webhook secrets
+        env:
+          INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
+          INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+          INFISICAL_PROJECT_ID: ${{ vars.INFISICAL_PROJECT_ID }}
+          INFISICAL_ENVIRONMENT: ${{ vars.INFISICAL_ENVIRONMENT }}
+          INFISICAL_API_URL: ${{ vars.INFISICAL_API_URL }}
+          INFISICAL_SECRET_PATH: ${{ secrets.INFISICAL_SECRET_PATH }}
+        run: |
+          bash scripts/install-infisical.sh
+          node scripts/ci-secrets.mjs
+          INFISICAL_SECRET_PATH="$INFISICAL_SECRET_PATH/webhook" node scripts/ci-secrets.mjs
+      - uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ env.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ env.TS_OAUTH_SECRET }}
+          tags: ${{ env.TAILSCALE_TAGS }}
+          version: '1.104.7'
+      - name: Check live exit node, Worker and Telegram identity
+        run: node scripts/check-deployment.mjs

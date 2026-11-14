@@ -15,7 +15,7 @@ try {
     env.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET = env.INFISICAL_CLIENT_SECRET;
     env.INFISICAL_TOKEN = command('infisical', ['login', '--method=universal-auth', '--plain', '--silent'], true, env);
     const rows = JSON.parse(command('infisical', ['secrets-manager', 'secrets', 'get', '--projectId='+env.INFISICAL_PROJECT_ID, '--env=dev', '--path='+env.INFISICAL_SECRET_PATH, '--output=json', '--expand=false', '--silent'], true, env));
-    for (const row of rows) env[row.secretKey] ??= row.secretValue;
+    for (const row of rows) if (!env[row.secretKey]) env[row.secretKey] = row.secretValue;
   }
   for (const key of ['R2_ENDPOINT','R2_BUCKET','R2_ACCESS_KEY_ID','R2_SECRET_ACCESS_KEY','PROFILE_ENCRYPTION_KEY']) {
     if (!env[key]) throw Error(`缺少 ${key}，请在 Infisical 本应用目录填写`);
