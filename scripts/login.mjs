@@ -28,5 +28,5 @@ try {
   if (!existsSync(directory+'/login-image.tar.gz')) command('gh', ['run','download',run,'--repo','C0verSnow/shared-video-transcriber','--name','docker-login-image','--dir',directory]);
   command('docker', ['load','--input',directory+'/login-image.tar.gz']);
   mkdirSync('.runtime/docker', { recursive: true, mode: 0o700 });
-  command('docker', ['compose','run','--rm','--no-build','--pull','never','--service-ports','login', ...process.argv.slice(2)], false, env);
+  command('docker', ['compose','run','--rm','--pull','never','--service-ports','login', ...process.argv.slice(2)], false, env);
 } catch (error) { console.error(error.message); process.exitCode = 1; }

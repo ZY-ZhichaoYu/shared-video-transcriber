@@ -57,6 +57,7 @@ jobs:
       - name: Check Rust CLI and real headed Chromium
         run: |
           docker run --rm shared-video-transcriber:ci --help
+          docker compose run --rm --pull never login --help
           docker run --rm --cap-add=SYS_ADMIN --security-opt seccomp=unconfined shared-video-transcriber:ci browser-check
       - name: Transcribe real sample audio using the packaged whisper.cpp
         run: |
