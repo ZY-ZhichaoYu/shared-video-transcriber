@@ -20,6 +20,10 @@
 
 - [1794631282] 遇到的问题：误执行了一次 Wrangler deploy --dry-run，它包含本地 JavaScript 打包，违反本仓库不做本地构建验证的约定；通用解决步骤：验证放远端 CI，无依赖 Worker 上传使用明确跳过构建的 --no-bundle；不要仅凭命令叫 dry-run 就认定是静态检查。已向用户说明，临时产物已从分支移除。
 
+## 问题及解决模板：Compose run 和 up 的参数不同
+
+- [1794632082] 遇到的问题：实际首次登录时，Compose run 拒绝 --no-build；通用解决步骤：按子命令帮助选择参数，登录服务本身不配置 build，再用 --pull never 运行远端镜像；远端 CI 增加实际 Compose 启动入口检查。
+
 ## 想做：
 
 - [1794631282] 用户最终目标：Telegram 收抖音分享链接，GitHub Actions 转文字，返回 TXT、SRT 和时间戳 JSON；Docker 只负责人工登录和更新完整登录档案，仓库一个 Python 脚本也不保留。
@@ -38,10 +42,14 @@
 ## 没做：
 
 - [1794631282] 未在本地进行 Rust 或 Docker 编译、构建、业务测试或冒烟；曾误执行一次 Worker 本地 dry-run 打包，已在上方如实记录，不能宣称完全没有本地打包。
-- [1794631282] 现有 Cloudflare 授权能部署 Worker、创建 bucket，却不能签发新 bucket 专用的 S3 读写凭证；R2_ACCESS_KEY_ID 和 R2_SECRET_ACCESS_KEY 尚未配置。没有拿其他应用的 bucket 凭证冒充本应用专用凭证。
+- [1794631282] 现有 Cloudflare 授权能部署 Worker、创建 bucket，却不能签发新 bucket 专用的 S3 读写凭证；最初无法配置；现已按用户授权接管浏览器创建并保存，见本次完成记录。没有拿其他应用的 bucket 凭证冒充本应用专用凭证。
 - [1794631282] 未替用户完成抖音扫码、短信或验证码；未实测真实抖音账号的登录上传恢复、真实视频转录和 Telegram 文件交付，不能把样例音频测试当作整条业务流程已通过。
-- [1794631282] 未合并 PR；新增 workflow 尚未进入默认分支，GitHub 生产 workflow_dispatch 需要 review 合入后启用。真实配置未齐，issue 暂不关闭，避免把未验收事项当成完成。
+- [1794631282] 未合并 PR；新增 workflow 尚未进入默认分支，GitHub 生产 workflow_dispatch 需要 review 合入后启用。首次真实账号验收还在进行，issue 暂不关闭，避免误报完成。
 
 ## 在做：
 
-- [1794631282] 正在收尾最新远端网络与线上 webhook 检查、格式检查和 PR 结果说明；R2 凭证和首次人工登录仍需补齐。
+- [1794631282] 正在收尾最新远端网络与线上 webhook 检查、格式检查和 PR 结果说明；R2 凭证已补齐，正在等待首次人工登录。
+
+- [1794632082] 用户明确授权 agent-browser 接管日常 Chrome；用户打开远程调试后，已在登录中的 Cloudflare 创建仅限 douyin-transcriber-private 的 Object Read & Write 账号凭证，写入 Infisical 并回读一致，临时密钥页面快照和明文文件已删除。
+- [1794632082] 最新代码提交 bebfbbe 的远端 CI 43557895083 全部成功，包含当前 dev 的有效 Tailscale OAuth、获准标签、实际大陆出口、抖音连通、线上 webhook 和 Telegram 身份检查；旧 prod 网络身份已替换，没有继续使用旧身份。
+- [1794632082] 已为用户打开现有 OrbStack，加载功能相同的已通过 CI 镜像并启动 Docker 人工登录。R2 preflight 已通过；浏览器页面已打开，等待用户本人完成登录。这里是用户要求的首次使用操作，没有本地编译。
