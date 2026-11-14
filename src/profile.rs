@@ -118,7 +118,8 @@ impl Store {
             .context("R2 版本读取失败")?
             .error_for_status()
             .context("没有可恢复的 R2 档案")?
-            .json().context("R2 版本清单格式不兼容")?;
+            .json()
+            .context("R2 版本清单格式不兼容")?;
         if pointer.schema != 1 || !pointer.object.starts_with(&format!("{}/", self.prefix)) {
             bail!("R2 档案格式或前缀不匹配");
         }
@@ -131,7 +132,8 @@ impl Store {
             .get(url)
             .send()
             .context("R2 档案下载失败")?
-            .error_for_status().context("R2 拒绝下载档案")?;
+            .error_for_status()
+            .context("R2 拒绝下载档案")?;
         let mut encrypted = NamedTempFile::new_in(&config.data)?;
         io::copy(&mut response, &mut encrypted)?;
         let staging = TempDir::new_in(&config.data)?;

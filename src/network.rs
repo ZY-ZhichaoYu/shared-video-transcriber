@@ -28,7 +28,11 @@ fn check_tailscale() -> Result<()> {
         bail!("Tailscale 没有选中在线的 exit node，停止任务");
     }
     let selected = &status["ExitNodeStatus"]["ID"];
-    if !status["Peer"].as_object().is_some_and(|peers| peers.values().any(|peer| peer["ID"] == *selected && peer["HostName"] == expected)) {
+    if !status["Peer"].as_object().is_some_and(|peers| {
+        peers
+            .values()
+            .any(|peer| peer["ID"] == *selected && peer["HostName"] == expected)
+    }) {
         bail!("Tailscale 选中的出口不符合 TAILSCALE_EXIT_NODE，停止任务");
     }
     let client = Client::builder()
