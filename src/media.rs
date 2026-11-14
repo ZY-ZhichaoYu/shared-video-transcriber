@@ -119,7 +119,7 @@ pub fn extract_url(text: &str) -> Result<String> {
         .context("请发送抖音视频分享链接")?
         .as_str()
         .trim_end_matches(['。', '，', '！', '？', '；', '）', ')', '】', ']', '》']);
-    let value = if matched.starts_with("http") {
+    let value = if matched.to_ascii_lowercase().starts_with("http") {
         matched.to_owned()
     } else {
         format!("https://{matched}")

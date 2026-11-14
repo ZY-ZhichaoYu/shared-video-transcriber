@@ -15,9 +15,7 @@ pub fn check() -> Result<()> {
 }
 
 fn check_tailscale() -> Result<()> {
-    let expected: IpAddr = crate::config::required("TAILSCALE_EXPECTED_IP")?
-        .parse()
-        .context("TAILSCALE_EXPECTED_IP 必须是出口节点的公网 IPv4")?;
+    let expected = crate::config::required("TAILSCALE_EXIT_NODE")?;
     let output = Command::new("tailscale")
         .args(["status", "--json"])
         .output()
@@ -29,6 +27,10 @@ fn check_tailscale() -> Result<()> {
     if status["BackendState"] != "Running" || status["ExitNodeStatus"]["Online"] != true {
         bail!("Tailscale 没有选中在线的 exit node，停止任务");
     }
+    let selected = &status["ExitNodeStatus"]["ID"];
+    if !status["Peer"].as_object().is_some_and(|peers| peers.values().any(|peer| peer["ID"] == *selected && peer["HostName"] == expected)) {
+        bail!("Tailscale 选中的出口不符合 TAILSCALE_EXIT_NODE，停止任务");
+    }
     let client = Client::builder()
         .no_proxy()
         .timeout(Duration::from_secs(20))
@@ -39,14 +41,11 @@ fn check_tailscale() -> Result<()> {
         .context("无法检查实际出口")?
         .error_for_status()?
         .text()?;
-    let address = trace
+    let _address = trace
         .lines()
         .find_map(|line| line.strip_prefix("ip="))
         .context("出口检查没有返回 IP")?
         .parse::<IpAddr>()?;
-    if address != expected {
-        bail!("实际公网出口不符合 TAILSCALE_EXPECTED_IP，停止任务");
-    }
     if !trace.lines().any(|line| line == "loc=CN") {
         bail!("实际出口不是中国大陆，停止任务");
     }

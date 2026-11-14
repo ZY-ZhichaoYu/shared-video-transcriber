@@ -42,6 +42,7 @@ jobs:
           node scripts/ci-secrets.mjs
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
+        id: image
         with:
           context: .
           load: true
@@ -60,25 +61,46 @@ jobs:
             docker run --rm -v /tmp/video-models:/models shared-video-transcriber:job model small
           fi
       - uses: tailscale/github-action@v4
+        id: tailscale
         with:
           oauth-client-id: ${{ env.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ env.TS_OAUTH_SECRET }}
           tags: ${{ env.TAILSCALE_TAGS }}
           version: '1.104.7'
           args: --exit-node=${{ env.TAILSCALE_EXIT_NODE }} --exit-node-allow-lan-access=false
-      - name: Transcribe and deliver TXT, SRT and JSON to Telegram
+      - name: Prepare private result directory
+        run: mkdir -m 777 /tmp/douyin-results
+      - name: Transcribe through the mainland exit node
+        id: transcript
+        continue-on-error: true
         env:
           VIDEO_INPUT: ${{ inputs.url }}
-          TELEGRAM_CHAT_ID: ${{ inputs.chat_id }}
           NETWORK_MODE: tailscale
+          VIDEO_RESULT_DIR: /results
         run: |
           docker run --rm --name douyin-job --network host --cap-add=SYS_ADMIN --security-opt seccomp=unconfined \
-            -v /tmp/video-models:/models:ro -v /tmp/video-input:/input:ro \
+            -v /tmp/video-models:/models:ro -v /tmp/douyin-results:/results \
             -v /var/run/tailscale:/var/run/tailscale:ro -v /usr/bin/tailscale:/usr/local/bin/tailscale:ro \
             -e R2_ENDPOINT -e R2_BUCKET -e R2_ACCESS_KEY_ID -e R2_SECRET_ACCESS_KEY \
-            -e PROFILE_ENCRYPTION_KEY -e R2_PROFILE_PREFIX -e TELEGRAM_BOT_TOKEN \
-            -e TELEGRAM_ALLOWED_USER_IDS -e TELEGRAM_CHAT_ID -e VIDEO_INPUT \
-            -e NETWORK_MODE -e TAILSCALE_EXPECTED_IP shared-video-transcriber:job telegram-job
+            -e PROFILE_ENCRYPTION_KEY -e R2_PROFILE_PREFIX -e VIDEO_INPUT -e VIDEO_RESULT_DIR \
+            -e NETWORK_MODE -e TAILSCALE_EXIT_NODE shared-video-transcriber:job transcribe-job
+      - name: Finish Douyin networking before Telegram delivery
+        if: always() && steps.tailscale.outcome == 'success'
+        run: sudo tailscale set --exit-node=
+      - name: Deliver TXT, SRT and JSON or explain the failure
+        if: always() && steps.image.outcome == 'success'
+        env:
+          TELEGRAM_CHAT_ID: ${{ inputs.chat_id }}
+          VIDEO_RESULT_DIR: /results
+        run: |
+          docker run --rm --network host -v /tmp/douyin-results:/results:ro \
+            -e TELEGRAM_BOT_TOKEN -e TELEGRAM_ALLOWED_USER_IDS -e TELEGRAM_CHAT_ID -e VIDEO_RESULT_DIR \
+            shared-video-transcriber:job telegram-deliver
       - name: Remove job container and temporary data
         if: always()
-        run: docker rm -f douyin-job >/dev/null 2>&1 || true
+        run: |
+          docker rm -f douyin-job >/dev/null 2>&1 || true
+          find /tmp/douyin-results -type f -delete 2>/dev/null || true
+      - name: Preserve transcription failure status
+        if: always() && steps.transcript.outcome != 'success'
+        run: exit 1

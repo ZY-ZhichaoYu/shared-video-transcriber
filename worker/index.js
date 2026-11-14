@@ -14,7 +14,7 @@ export default {
         || !allowed.includes(String(message.from?.id)) || message.chat.id !== message.from.id) {
       return new Response('ok');
     }
-    const text = message.text || '';
+    const text = typeof message.text === 'string' ? message.text : '';
     if (text === '/start' || text === '/help') {
       await notify(env, message.chat.id, '把抖音视频的分享链接发给我，GitHub Actions 会转成文字，并把 TXT、SRT 和时间戳 JSON 发回来。');
       return new Response('ok');
@@ -50,8 +50,10 @@ export function douyinUrl(text) {
 }
 
 async function notify(env, chat, text) {
+  try {
   const response = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chat, text }),
   });
   return response.ok;
+  } catch { return false; }
 }

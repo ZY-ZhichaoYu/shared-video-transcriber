@@ -12,7 +12,7 @@ try {
   env.INFISICAL_TOKEN = call(['login', '--method=universal-auth', '--plain']).trim();
   console.log(`::add-mask::${env.INFISICAL_TOKEN}`);
   const rows = JSON.parse(call(['secrets-manager', 'secrets', 'get', `--projectId=${env.INFISICAL_PROJECT_ID}`, `--env=${env.INFISICAL_ENVIRONMENT || 'dev'}`, `--path=${env.INFISICAL_SECRET_PATH}`, '--output=json', '--expand=false']));
-  const names = ['R2_ENDPOINT','R2_BUCKET','R2_ACCESS_KEY_ID','R2_SECRET_ACCESS_KEY','PROFILE_ENCRYPTION_KEY','R2_PROFILE_PREFIX','TELEGRAM_BOT_TOKEN','TELEGRAM_ALLOWED_USER_IDS','TS_OAUTH_CLIENT_ID','TS_OAUTH_SECRET','TAILSCALE_TAGS','TAILSCALE_EXIT_NODE','TAILSCALE_EXPECTED_IP'];
+  const names = ['R2_ENDPOINT','R2_BUCKET','R2_ACCESS_KEY_ID','R2_SECRET_ACCESS_KEY','PROFILE_ENCRYPTION_KEY','R2_PROFILE_PREFIX','TELEGRAM_BOT_TOKEN','TELEGRAM_ALLOWED_USER_IDS','TS_OAUTH_CLIENT_ID','TS_OAUTH_SECRET','TAILSCALE_TAGS','TAILSCALE_EXIT_NODE'];
   for (const row of rows) {
     if (!names.includes(row.secretKey)) continue;
     console.log(`::add-mask::${row.secretValue}`);

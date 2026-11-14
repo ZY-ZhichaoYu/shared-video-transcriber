@@ -44,8 +44,10 @@ enum Action {
         #[arg(long, default_value = "zh")]
         language: String,
     },
-    /// CI 专用：读取 VIDEO_INPUT 和 TELEGRAM_CHAT_ID，转文字并发送到 Telegram
-    TelegramJob,
+    /// CI 专用：读取 VIDEO_INPUT，在指定结果目录生成文字稿，不把文字写进 CI 日志
+    TranscribeJob,
+    /// CI 专用：读取结果目录，把文字稿发回授权的 Telegram 私聊
+    TelegramDeliver,
     /// 下载 whisper.cpp 官方模型（不需要 Python）
     Model {
         #[arg(default_value = "small")]
@@ -98,7 +100,8 @@ fn execute(cli: Cli) -> Result<()> {
             eprintln!("文字稿保存在 {}", output.directory.display());
             Ok(())
         }
-        Action::TelegramJob => telegram::job(&config),
+        Action::TranscribeJob => telegram::transcribe_job(&config),
+        Action::TelegramDeliver => telegram::deliver(),
         Action::Model { size } => download_model(&config, &size),
         Action::BrowserCheck => {
             let mut browser = Browser::open(&config, false)?;

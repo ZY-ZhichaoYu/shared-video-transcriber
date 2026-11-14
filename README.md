@@ -18,13 +18,13 @@ flowchart LR
 
 1. 将 `.env.example` 复制成 `.env`，填写本应用私有 R2 的配置和 `PROFILE_ENCRYPTION_KEY`。密钥来自 `shared-video-transcriber keygen`，格式为 `AGE-SECRET-KEY-...`。真实值应放在 Infisical 共用 Project 的 `dev`、`/douyin-transcriber` 目录。
 2. 本地安装 Docker，创建供容器用户使用的数据目录：`mkdir -p .runtime/docker`。Linux 上确保这个目录属于 UID 1000；macOS Docker Desktop 通常会自动映射权限。
-3. 在远端 CI 构建镜像；本机运行已构建镜像，或在允许本地构建的环境执行 `docker compose build`。本仓库工作约定禁止为了验证改动在本地构建。
-4. 运行 `docker compose run --rm --service-ports login`，打开 http://127.0.0.1:6080/vnc_lite.html 。点击连接，在工具的 Chromium 里亲自登录抖音，完成验证码。
+3. 安装 Node.js 22、GitHub CLI、Infisical CLI，并运行 `node scripts/login.mjs`。脚本从当前分支最后一次成功的远端 CI 下载 Docker 镜像并加载，读取 Infisical 本应用密钥，然后启动登录容器；不会在本地构建。
+4. 打开 http://127.0.0.1:6080/vnc_lite.html 。点击连接，在工具的 Chromium 里亲自登录抖音，完成验证码。
 5. Rust 检查抖音自己的登录接口。确认有效后正常关闭 Chromium，把完整 `browser.ini` 和 `user-data` 归档，使用 age 认证加密后上传私有 R2。上传成功再更新 `latest.json`，旧版本保留；本地明文目录随后清理。
 
 完整用户目录包含 Cookie、Local Storage、IndexedDB 和缓存；只排除 `Singleton*` 进程锁。不会读取电脑日常浏览器的档案。容器使用非 root 用户并保留 Chromium 沙箱；Compose 的 `SYS_ADMIN` 和放宽 seccomp 是为沙箱所需的命名空间操作，仅给这个专用容器使用。浏览器调试接口仅监听容器内回环地址，登录网页只映射到宿主 `127.0.0.1`。
 
-上传失败会保留这次已关闭的本地档案，可用 `docker compose run --rm login upload` 重试。登录状态未知、过期、取消或浏览器被强杀时，不上传新档案，也不覆盖旧版本。
+上传失败会保留这次已关闭的本地档案，可用 `node scripts/login.mjs upload` 重试。登录状态未知、过期、取消或浏览器被强杀时，不上传新档案，也不覆盖旧版本。
 
 ## Telegram 和 CI 配置
 
@@ -43,7 +43,7 @@ Worker 密钥通过 Infisical 官方 Cloudflare Secret Sync 分发。`GITHUB_DIS
 
 CI 使用 `.github/workflows/transcribe.yml`。每次从 R2 恢复档案，验证登录后读取抖音页面返回的视频地址，下载音视频并用 FFmpeg 提取 16 kHz 单声道音轨，调用 whisper.cpp 转文字。完整 TXT、SRT、JSON 分别发回 Telegram；视频和音轨仅是中间文件，不作为结果发送。会话和文字稿不上传 GitHub Artifacts，也不放进 Actions 缓存。
 
-Tailscale 使用现有 OAuth 身份和出口 `armbian`；需确认出口在线、获得授权并设置 `TAILSCALE_EXPECTED_IP`。CI 检查实际公网 IP、中国大陆地区和抖音可达性，不符合就停止。模型和镜像在切换出口前准备。Telegram 和 R2 也必须能经这个出口访问；不会自动直连兜底。GitHub Actions 使用排队式 concurrency，避免同时改同一账号。
+Tailscale 使用现有 OAuth 身份和出口 `armbian`；需确认出口在线、获得授权。CI 核对选中设备名称、实际公网地址、中国大陆地区和抖音可达性，不符合就停止。模型和镜像在切换出口前准备。R2 须能经大陆出口访问；抖音处理结束后显式关闭出口，再通过 Runner 默认网络向 Telegram 交付，这两个阶段在 workflow 中分别列出。取流失败不会自动直连重试抖音。GitHub Actions 使用排队式 concurrency，避免同时改同一账号。
 
 新 workflow 必须先合入默认分支，GitHub 才能接受 webhook 的 `workflow_dispatch`。PR review 期间只运行远端回归检查，不宣称生产机器人已经能完成真实抖音转录。
 
@@ -56,10 +56,11 @@ shared-video-transcriber restore
 shared-video-transcriber model small
 shared-video-transcriber transcribe '抖音分享文字或链接'
 shared-video-transcriber transcribe --file /input/example.wav
-shared-video-transcriber telegram-job
+shared-video-transcriber transcribe-job
+shared-video-transcriber telegram-deliver
 ```
 
-`telegram-job` 从 `VIDEO_INPUT`、`TELEGRAM_CHAT_ID` 读取本次请求。只接收允许名单内的私聊 ID。`WHISPER_MODEL` 指向 ggml 模型文件；默认 small，语言默认中文。本地音视频入口用于诊断和远端回归，原文件不会被删除。
+`transcribe-job` 从 `VIDEO_INPUT` 读取本次请求，将结果写到 `VIDEO_RESULT_DIR`，不把正文写进 CI 日志；`telegram-deliver` 从结果目录向 `TELEGRAM_CHAT_ID` 交付。只接收允许名单内的私聊 ID。`WHISPER_MODEL` 指向 ggml 模型文件；默认 small，语言默认中文。本地音视频入口用于诊断和远端回归，原文件不会被删除。
 
 每次结果保存在独立的 `VIDEO_DATA_DIR/jobs/<任务 ID>`：`transcript.txt`、`transcript.srt`、Whisper 原始 `transcript.json` 和统一结构的 `result.json`。没有人声时明确失败，不发送假文字。
 
