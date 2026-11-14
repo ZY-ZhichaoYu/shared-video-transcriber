@@ -26,32 +26,27 @@
 
 ## 想做：
 
-- [1794631282] 用户最终目标：Telegram 收抖音分享链接，GitHub Actions 转文字，返回 TXT、SRT 和时间戳 JSON；Docker 只负责人工登录和更新完整登录档案，仓库一个 Python 脚本也不保留。
+- [1794632806] 用户 review PR #2；合入默认分支后，Telegram 的生产 workflow_dispatch 才能正式触发转录，再用一条真实分享链接验收文件返回。
 
 ## 做完：
 
-- [1794631282] 已在 feature/issue-1-rust-docker 实现 Rust 核心、Docker 登录、完整 browser.ini 和 user-data 的 age 认证加密上传恢复；去掉 Python、yt-dlp、其他平台、旧网页和 MCP 入口，不改原数据目录。
-- [1794631282] 已提交 PR #2 给用户 review，不自动合并：https://github.com/C0verSnow/shared-video-transcriber/pull/2 。本次在最后一次代码提交前重新按四象限整理记录。
-- [1794631282] 已创建 @C0verSnow_DouyinText_bot，并用 gotd/cli 核对个人账号、向 BotFather 创建独立机器人；密钥未写进源码。Worker https://douyin-transcriber-webhook.f1515xcn.workers.dev 已上传，Telegram webhook 注册成功。
-- [1794631282] 已创建私有 R2 bucket douyin-transcriber-private；共用 Infisical Project 的 dev 中独立建 /douyin-transcriber 和 /douyin-transcriber/webhook，保存新 age 私钥、机器人、网络配置；组织读取身份对仓库可见，仓库路径 Secret 已配置。本地 .env 为 0600，只保存已有读取身份和应用路径。
-- [1794631282] Infisical 官方 Cloudflare Worker Secret Sync 已成功，Worker 只接收四项 webhook 所需密钥；R2 密钥和档案解密密钥没有交给 Worker。
-- [1794631282] 远端 Rust 回归、Clippy、五项 webhook 测试、真实 headed Chromium、正常关闭、完整档案加密往返和损坏拒绝、whisper.cpp 样例音频转文字均已通过。通过记录包含 43557024371、43557029546；最新配置检查结果另行补充。
-- [1794631282] 已提供 node scripts/login.mjs：从成功的远端 CI 下载镜像并加载，读取 Infisical 后启动登录，不在本地构建。CI 中大陆出口取流和关闭出口后向 Telegram 交付分成两个阶段；正文、会话和视频不上传 Artifacts，也不打印正文。
-- [1794631282] 已在 GitHub 检索和比较 whisper.cpp、yt-dlp、Tailscale、抖音实现及官方工具；采用 whisper.cpp 和 Chromium 页面取流，未采用 yt-dlp，名称、链接、许可证和限制见 docs/DESIGN.md。
+- [1794632806] 完成 issue #1 的实现，在 feature/issue-1-rust-docker 提交 PR #2：https://github.com/C0verSnow/shared-video-transcriber/pull/2 。按 issue 要求关闭 issue，不自动合并 PR。本次最终提交前重新按四象限整理记录。
+- [1794632806] 用户最终要求是抖音转文字、远端 CI 执行、Telegram 收链接和文字稿；已移除全部 Python 源码、启动器、依赖、yt-dlp、其他平台、旧网页和 MCP 入口，Rust 负责下载转录与档案管理，FFmpeg 和 whisper.cpp 作为镜像内工具。
+- [1794632806] Docker 登录功能已实际使用：用户亲自登录抖音，Rust 确认身份有效，正常关闭 Chromium，将完整 browser.ini 和 user-data 认证加密上传私有 R2，然后自动清理本地明文目录。只排除 Singleton 进程锁，不删减缓存、Cookie、Local Storage 或 IndexedDB。
+- [1794632806] 已创建独立机器人 @C0verSnow_DouyinText_bot；用 browser-persistent-runner 技能和 gotd/cli 的现有个人会话向 BotFather 创建机器人，个人 Telegram 会话没有交给 CI。Worker https://douyin-transcriber-webhook.f1515xcn.workers.dev 已上传，Telegram webhook 已注册，限定当前用户私聊。
+- [1794632806] 已建私有 bucket douyin-transcriber-private，Infisical 共用 Project 的 dev 下独立建 /douyin-transcriber 和 /douyin-transcriber/webhook，保存独立 age 密钥和本应用配置。按用户授权使用 agent-browser 接入已登录 Chrome，创建只允许这个 bucket 的 Object Read & Write 凭证，写入 Infisical 并回读一致；临时页面和明文密钥已删除。
+- [1794632806] GitHub 复用组织共享读取身份，仓库 Secret 指向本应用目录。本地 .env 为 0600，只保留已有读取身份和路径，不复制业务密钥。官方 Cloudflare Secret Sync 已成功，Worker 只接收四项 webhook 所需密钥，没有获得 R2 或档案解密密钥。
+- [1794632806] 已使用当前 dev 的有效 Tailscale OAuth 和真实获准标签，旧 prod 身份已替换。大陆出口负责抖音取流；该阶段明确结束后，Runner 默认网络负责 Telegram 交付。不会在抖音取流失败时偷偷直连重试。
+- [1794632806] 最新代码 98e6553 的远端 CI 43559244387 全部通过：https://github.com/C0verSnow/shared-video-transcriber/actions/runs/43559244387 。包含 Rust 回归、格式、Clippy、五项 webhook 测试、真实 Compose 命令、headed Chromium/CDP/正常退出、完整档案加密往返与损坏拒绝、镜像内 whisper.cpp 样例音频转文字、真实大陆出口和线上 webhook 检查，以及新 Runner 下载解密本次真实 R2 档案并成功确认抖音仍已登录。
+- [1794632806] 登录脚本从成功的远端 CI 下载镜像，不在本地构建。用户现有 OrbStack 已启动，首次登录使用已通过 CI 的同功能镜像；CI 和本机操作不会把文字稿、会话或视频作为 GitHub Artifacts，也不打印文字稿正文。
+- [1794632806] 已在 GitHub 检索和比较 whisper.cpp、yt-dlp、Tailscale、抖音实现和官方工具；采用和排除的理由、许可证、链接和限制见 docs/DESIGN.md。已清理任务中的临时凭证快照，不改其他仓库配置或日常浏览器档案。
 
 ## 没做：
 
-- [1794631282] 未在本地进行 Rust 或 Docker 编译、构建、业务测试或冒烟；曾误执行一次 Worker 本地 dry-run 打包，已在上方如实记录，不能宣称完全没有本地打包。
-- [1794631282] 现有 Cloudflare 授权能部署 Worker、创建 bucket，却不能签发新 bucket 专用的 S3 读写凭证；最初无法配置；现已按用户授权接管浏览器创建并保存，见本次完成记录。没有拿其他应用的 bucket 凭证冒充本应用专用凭证。
-- [1794631282] 未替用户完成抖音扫码、短信或验证码；未实测真实抖音账号的登录上传恢复、真实视频转录和 Telegram 文件交付，不能把样例音频测试当作整条业务流程已通过。
-- [1794631282] 未合并 PR；新增 workflow 尚未进入默认分支，GitHub 生产 workflow_dispatch 需要 review 合入后启用。首次真实账号验收还在进行，issue 暂不关闭，避免误报完成。
+- [1794632806] 没有本地 Rust/Docker 编译、构建或业务冒烟；曾误执行一次包含 JavaScript 本地打包的 Wrangler dry-run，已向用户说明并记录问题模板，不能宣称完全没有本地打包。后续 Worker 上传使用 --no-bundle，编译和测试放远端。
+- [1794632806] 没有合并 PR。由于用户要求等 review，新增转录 workflow 还没有进入默认分支，尚未实测 Telegram 生产派发一条真实视频并收到文字稿的整个流程；不把样例语音、真实登录恢复或线上 webhook 检查冒充这项验收。
+- [1794632806] 不迁移或删除旧 .data；不读取日常浏览器账号作为抖音档案，不代用户输入密码、短信或验证码。
 
 ## 在做：
 
-- [1794631282] 正在收尾最新远端网络与线上 webhook 检查、格式检查和 PR 结果说明；R2 凭证已补齐，正在等待首次登录后的远端恢复检查。
-
-- [1794632082] 用户明确授权 agent-browser 接管日常 Chrome；用户打开远程调试后，已在登录中的 Cloudflare 创建仅限 douyin-transcriber-private 的 Object Read & Write 账号凭证，写入 Infisical 并回读一致，临时密钥页面快照和明文文件已删除。
-- [1794632082] 最新代码提交 bebfbbe 的远端 CI 43557895083 全部成功，包含当前 dev 的有效 Tailscale OAuth、获准标签、实际大陆出口、抖音连通、线上 webhook 和 Telegram 身份检查；旧 prod 网络身份已替换，没有继续使用旧身份。
-- [1794632082] 已为用户打开现有 OrbStack，加载功能相同的已通过 CI 镜像并启动 Docker 人工登录。R2 preflight 已通过；浏览器页面已打开，等待用户本人完成登录。这里是用户要求的首次使用操作，没有本地编译。
-
-- [1794632316] 用户已在 Docker 中完成抖音登录；Rust 确认真实登录有效，正常关闭 Chromium，将完整 ini 和用户目录认证加密上传 R2，成功后自动删除本次明文档案。接下来用新 Runner 验证真实恢复后的登录，不做本地编译或冒烟。最后一次代码改动前已再次整理验收进度。
+- [1794632806] 实现和本轮检查已收尾，等待用户 review；没有继续运行的登录收集任务。
