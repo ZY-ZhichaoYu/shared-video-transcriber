@@ -78,7 +78,8 @@ jobs:
           oauth-secret: ${{ env.TS_OAUTH_SECRET }}
           tags: ${{ env.TAILSCALE_TAGS }}
           version: '1.104.7'
-          args: --exit-node=${{ env.TAILSCALE_EXIT_NODE }} --exit-node-allow-lan-access=false
+      - name: Select the mainland exit after joining the tailnet
+        run: sudo tailscale set --exit-node="$TAILSCALE_EXIT_NODE" --exit-node-allow-lan-access=false
       - name: Prepare private result directory
         run: mkdir -m 777 /tmp/douyin-results
       - name: Transcribe through the mainland exit node
