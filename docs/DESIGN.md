@@ -18,3 +18,5 @@ GitHub 检索后比较：
 Telegram 个人账号的机器人创建与管理使用现有 gotd/cli 会话；业务 webhook 和机器人发送文件使用 Telegram 官方 Bot API。二者不是同一份会话，个人账号会话不会交给 CI 或 Worker。
 
 R2 每次上传唯一版本对象，成功后更新 latest.json。下载、认证解密和完整目录检查通过后才恢复。CI 只读恢复后的账号档案，不在每次转文字后回写账号，避免失败任务污染已验证登录。
+
+真实分享链接验收发现，首次 Tailscale up 还没有节点列表时不能按主机名选择出口。已检索并核对 [Tailscale 官方实现](https://github.com/tailscale/tailscale/blob/0d822c9d3ab06465e95868fe63c6a26fff55e170/ipn/prefs.go)：先用官方 Action 加入网络，再用 tailscale set 选择 armbian；转录入口继续核对实际出口、地区和抖音连通性。使用同一条用户链接复验，远端获取视频、转文字、Telegram 三种文件交付全部通过，见 [真实视频验收 CI](https://github.com/C0verSnow/shared-video-transcriber/actions/runs/43560354503)。
